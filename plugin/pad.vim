@@ -1,7 +1,7 @@
 " File:			pad.vim
 " Description:	Quick-notetaking for vim.
 " Author:		Felipe Morales
-" Version:		0.3
+" Version:		0.4
 
 if (exists("g:loaded_pad") && g:loaded_pad) || &cp
     finish
@@ -27,6 +27,9 @@ if !exists('g:pad_search_ignorecase')
 endif
 if !exists('g:pad_read_nchars_from_files')
 	let g:pad_read_nchars_from_files = 200
+endif
+if !exists('g:pad_highlighting_variant')
+	let g:pad_highlighting_variant = 0
 endif
 
 " Commands:
@@ -120,7 +123,7 @@ class Pad(object):
 			vim.command("bd")
 			move(old_path, new_path)
 
-	def open_pad(self, path=None):
+	def open_pad(self, path=None, first_line=None):
 		if not path:
 			path = self.save_dir + str(int(time.time() * 1000000))
 		vim.command("silent! botright" + self.window_height + "split " + path)
@@ -128,6 +131,9 @@ class Pad(object):
 			vim.command("set filetype=" + self.filetype)
 		vim.command("noremap <silent> <buffer> <localleader><delete> :py pad.delete_current_pad()<cr>")
 		vim.command("noremap <silent> <buffer> <localleader>+m :py pad.add_modeline()<cr>")
+		if first_line:
+			vim.current.buffer.append(first_line,0)
+			vim.command("normal j")
 
 	def delete_current_pad(self):
 		path = vim.current.buffer.name
@@ -170,22 +176,25 @@ class Pad(object):
 			with open(expanduser(self.save_dir) + pad) as pad_file:
 				data = [line for line in pad_file.read(self.read_chars).split("\n") if line != ""]
 			
-			# we discard modelines
-			if re.match("^.* vim: set .*:.*$", data[0]):
-				data = data[1:]
-		
-			summary = data[0].strip()
-			if summary[0] in ("%", "#"): #pandoc and markdown titles
-				summary = "".join(summary[1:]).strip()
-			
-			body = "\n".join([line.strip() for line in data[1:]]).\
-					replace("\n", u'\u21b2 '.encode('utf-8'))
-			
-			tail = ''
-			if data[1:] not in ([''], []):
-				tail = u'\u21b2'.encode('utf-8') + ' ' +  body
+			if data != []:
+				# we discard modelines
+				if re.match("^.* vim: set .*:.*$", data[0]):
+					data = data[1:]
+				
+				summary = data[0].strip()
+				if summary[0] in ("%", "#"): #pandoc and markdown titles
+					summary = "".join(summary[1:]).strip()
+				
+				body = "\n".join([line.strip() for line in data[1:]]).\
+						replace("\n", u'\u21b2 '.encode('utf-8'))
+				
+				tail = ''
+				if data[1:] not in ([''], []):
+					tail = u'\u21b2'.encode('utf-8') + ' ' +  body
 
-			lines.append(pad + " @" + get_natural_timestamp(pad).ljust(19) + " │ " + summary + tail)
+				lines.append(pad + " @" + get_natural_timestamp(pad).ljust(19) + " │ " + summary + tail)
+			else:
+				lines.append(pad + " @" + get_natural_timestamp(pad).ljust(19) + " │ " + "[EMPTY]")
 		vim.current.buffer.append(list(reversed(sorted(lines))))
 		vim.command("normal dd")
 		vim.command("setlocal nomodifiable")
@@ -209,7 +218,7 @@ class Pad(object):
 	def edit_pad(self):
 		path = self.save_dir + vim.current.line.split(" @")[0]
 		vim.command("bd")
-		self.open_pad(path)
+		self.open_pad(path=path)
 
 	def delete_pad(self):
 		confirm = vim.eval('input("really delete? (y/n): ")')
@@ -217,13 +226,21 @@ class Pad(object):
 			path = expanduser(self.save_dir) + vim.current.line.split(" @")[0]
 			remove(path)
 			vim.command("bd")
+			vim.command("redraw!")
 
 	def incremental_search(self):
 		query = ""
+		should_create_on_enter = False
+		
+		vim.command("echohl None")
 		vim.command('echo ">> "')
 		while True:
 			raw_char = vim.eval("getchar()")
 			if raw_char in ("13", "27"):
+				if raw_char == "13" and should_create_on_enter:
+					vim.command("bw")
+					self.open_pad(first_line=query)
+					vim.command("echohl None")
 				vim.command("redraw!")
 				break
 			else:
@@ -240,10 +257,12 @@ class Pad(object):
 				self.fill_list(pad_files)
 				info = ""
 				vim.command("echohl None")
+				should_create_on_enter = False
 			else:
 				del vim.current.buffer[:]
-				info = "[NOT FOUND] "
-				vim.command("echohl Error")
+				info = "[NEW] "
+				vim.command("echohl WarningMsg")
+				should_create_on_enter = True
 			vim.command("redraw")
 			vim.command('echo ">> ' + info + query + '"')
 
