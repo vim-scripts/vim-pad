@@ -25,24 +25,25 @@ endif
 if !exists('g:pad_search_ignorecase')
 	let g:pad_search_ignorecase = 1
 endif
-if !exists('g:pad_search_show_only_first')
-	let g:pad_search_show_only_first = 1
+if !exists('g:pad_read_nchars_from_files')
+	let g:pad_read_nchars_from_files = 200
 endif
 
 " Commands:
 "
 command! OpenPad exec 'py pad.open_pad()'
-command! -nargs=? ListPads exec 'py pad.list_pads("<args>")'
+command! -nargs=? ListPads exec "py pad.list_pads('<args>')"
 
 " Key Mappings:
 "
 " IMPORTANT: Change this to your linking
-"
+
 if !exists('g:pad_custom_mappings') || g:pad_custom_mappings == 0
 	noremap <silent> <C-esc> <esc>:ListPads<CR>
 	inoremap <silent> <C-esc> <esc>:ListPads<CR>
 	noremap <silent> <S-esc> <esc>:OpenPad<CR>
 	inoremap <silent> <S-esc> <esc>:OpenPad<CR>
+	noremap <silent> <leader>s  :py pad.search_pads()<cr>
 endif
 
 " To update the date when files are modified
@@ -94,8 +95,8 @@ class Pad(object):
 		self.filetype = vim.eval("g:pad_format")
 		self.window_height = str(vim.eval("g:pad_window_height"))
 		self.search_backend = vim.eval("g:pad_search_backend")
-		self.ignore_case = bool(int((vim.eval("g:pad_search_ignorecase"))))
-		self.only_first = bool(int(vim.eval("g:pad_search_show_only_first")))
+		self.ignore_case = bool(int(vim.eval("g:pad_search_ignorecase")))
+		self.read_chars = int(vim.eval("g:pad_read_nchars_from_files"))
 
 		# vim-pad pollutes the MRU.vim list quite a lot, if let alone.
 		# This should fix that.
@@ -125,23 +126,24 @@ class Pad(object):
 		vim.command("silent! botright" + self.window_height + "split " + path)
 		if vim.eval('&filetype') in ('', 'conf'):
 			vim.command("set filetype=" + self.filetype)
-		vim.command("noremap <silent> <buffer> <localleader><delete> :py delete_current_pad()<cr>")
-		vim.command("noremap <silent> <buffer> <localleader>+m :py add_modeline()<cr>")
+		vim.command("noremap <silent> <buffer> <localleader><delete> :py pad.delete_current_pad()<cr>")
+		vim.command("noremap <silent> <buffer> <localleader>+m :py pad.add_modeline()<cr>")
 
 	def delete_current_pad(self):
 		path = vim.current.buffer.name
 		if exists(path):
-			confirm = vim.eval('input("really delete? (Y/n): ")')
+			confirm = vim.eval('input("really delete? (y/n): ")')
 			if confirm in ("y", "Y"):
 				remove(path)
 				vim.command("bd!")
 				vim.command("unmap <leader><delete>")
+				vim.command("redraw!")
 
 	def add_modeline(self):
 		mode = vim.eval('input("filetype: ", "", "filetype")')
 		if mode:
-			vim.current.buffer[0] = "<!-- vim: set ft=" + mode + ": -->"
-			ft = re.search("ft=.*(?=:)", vim.current.line).group().split("=")[1]
+			vim.current.buffer.append("<!-- vim: set ft=" + mode + ": -->", 0)
+			ft = re.search("ft=.*(?=:)", vim.current.buffer[0]).group().split("=")[1]
 			vim.command("set filetype=" + ft)
 			vim.command("set nomodified")
 
@@ -155,8 +157,7 @@ class Pad(object):
 				command = ["/usr/bin/vendor_perl/ack", query, expanduser(self.save_dir), "--type=text"]
 			if self.ignore_case:
 				command.append("-i")
-			if self.only_first:
-				command.append("--max-count=1")
+			command.append("--max-count=1")
 			search_results = [line.split(":")[0] for line in Popen(command, stdout=PIPE, stderr=PIPE).communicate()[0].\
 												replace(expanduser(self.save_dir), "").\
 												split("\n")	if line != '']	
@@ -167,31 +168,24 @@ class Pad(object):
 		lines = []
 		for pad in files:
 			with open(expanduser(self.save_dir) + pad) as pad_file:
-				data = pad_file.read(200).split("\n")
-			head = ''
-			if re.match("^.* vim: set .*:.*$", data[0]): #we have a modeline
-				ft = re.search("ft=.*(?=:)", data[0]).group().split("=")[1]
-				if ft == "vo_base":
-					ft = "vo"
-				elif ft == "pandoc":
-					ft = "pd"
-				elif ft == "markdown":
-					ft = "md"
-				head = '▪' + ft + '▪ '
-				data = data[1:] #we discard it
+				data = [line for line in pad_file.read(self.read_chars).split("\n") if line != ""]
 			
+			# we discard modelines
+			if re.match("^.* vim: set .*:.*$", data[0]):
+				data = data[1:]
+		
 			summary = data[0].strip()
 			if summary[0] in ("%", "#"): #pandoc and markdown titles
 				summary = "".join(summary[1:]).strip()
 			
-			body = "\n".join([line.strip() for line in data[1:] if line != '']).\
+			body = "\n".join([line.strip() for line in data[1:]]).\
 					replace("\n", u'\u21b2 '.encode('utf-8'))
 			
 			tail = ''
-			if data[1:] != ['']:
+			if data[1:] not in ([''], []):
 				tail = u'\u21b2'.encode('utf-8') + ' ' +  body
 
-			lines.append(pad + " @" + get_natural_timestamp(pad).ljust(19) + " │ " + head + summary + tail)
+			lines.append(pad + " @" + get_natural_timestamp(pad).ljust(19) + " │ " + summary + tail)
 		vim.current.buffer.append(list(reversed(sorted(lines))))
 		vim.command("normal dd")
 		vim.command("setlocal nomodifiable")
@@ -207,13 +201,18 @@ class Pad(object):
 		else:
 			print "no pads"
 
+	def search_pads(self):
+		query = vim.eval('input("search in notes for: ")')
+		self.list_pads(query)
+		vim.command("redraw!")
+
 	def edit_pad(self):
 		path = self.save_dir + vim.current.line.split(" @")[0]
 		vim.command("bd")
 		self.open_pad(path)
 
 	def delete_pad(self):
-		confirm = vim.eval('input("really delete? (Y/n): ")')
+		confirm = vim.eval('input("really delete? (y/n): ")')
 		if confirm in ("y", "Y"):
 			path = expanduser(self.save_dir) + vim.current.line.split(" @")[0]
 			remove(path)
@@ -224,24 +223,27 @@ class Pad(object):
 		vim.command('echo ">> "')
 		while True:
 			raw_char = vim.eval("getchar()")
-			try:
-				char = int(raw_char)
-				if char in (13, 27): # <Enter>
-					vim.command("redraw!")
-					break
-				else:
-					query = query + vim.eval("nr2char(" + str(char) + ")")
-			except:
-				if list(raw_char) == ['\x80', 'k', 'b']:
-					query = query[:-1]
+			if raw_char in ("13", "27"):
+				vim.command("redraw!")
+				break
+			else:
+				try: # if we can convert to an int, we have a regular key
+					int(raw_char) # we check this way so we bring up an error on nr2char
+					query = query + vim.eval("nr2char(" + raw_char + ")")
+				except: # if we don't, we have some special key
+					keycode = unicode(raw_char, errors="ignore")
+					if keycode == "kb":
+						query = query[:-1]
 			vim.command("setlocal modifiable")
 			pad_files = self.get_filelist(query)
 			if pad_files != []:
 				self.fill_list(pad_files)
 				info = ""
+				vim.command("echohl None")
 			else:
 				del vim.current.buffer[:]
 				info = "[NOT FOUND] "
+				vim.command("echohl Error")
 			vim.command("redraw")
 			vim.command('echo ">> ' + info + query + '"')
 
