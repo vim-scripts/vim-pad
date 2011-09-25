@@ -1,7 +1,12 @@
+" File:			pad.vim
+" Description:	Quick-notetaking for vim.
+" Author:		Felipe Morales
+" Version:		0.3
+
 if (exists("g:loaded_pad") && g:loaded_pad) || &cp
     finish
 endif
-let g:loaded_pad = 0
+let g:loaded_pad = 1
 
 " Default Settings:
 "
@@ -15,7 +20,7 @@ if !exists('g:pad_window_height')
 	let g:pad_window_height = 5
 endif
 if !exists('g:pad_search_backend')
-	let g:pad_search_backend = "ack"
+	let g:pad_search_backend = "grep"
 endif
 if !exists('g:pad_search_ignorecase')
 	let g:pad_search_ignorecase = 1
@@ -27,7 +32,7 @@ endif
 " Commands:
 "
 command! OpenPad exec 'py pad.open_pad()'
-command! ListPads exec 'py pad.list_pads()'
+command! -nargs=? ListPads exec 'py pad.list_pads("<args>")'
 
 " Key Mappings:
 "
@@ -117,7 +122,7 @@ class Pad(object):
 	def open_pad(self, path=None):
 		if not path:
 			path = self.save_dir + str(int(time.time() * 1000000))
-		vim.command("botright" + self.window_height + "split " + path)
+		vim.command("silent! botright" + self.window_height + "split " + path)
 		if vim.eval('&filetype') in ('', 'conf'):
 			vim.command("set filetype=" + self.filetype)
 		vim.command("noremap <silent> <buffer> <localleader><delete> :py delete_current_pad()<cr>")
@@ -189,9 +194,10 @@ class Pad(object):
 			lines.append(pad + " @" + get_natural_timestamp(pad).ljust(19) + " │ " + head + summary + tail)
 		vim.current.buffer.append(list(reversed(sorted(lines))))
 		vim.command("normal dd")
+		vim.command("setlocal nomodifiable")
 	
-	def list_pads(self):
-		pad_files = self.get_filelist()
+	def list_pads(self, query):
+		pad_files = self.get_filelist(query)
 		if len(pad_files) > 0:
 			if vim.eval("bufexists('__pad__')") == "1":
 				vim.command("bw __pad__")
@@ -228,13 +234,16 @@ class Pad(object):
 			except:
 				if list(raw_char) == ['\x80', 'k', 'b']:
 					query = query[:-1]
+			vim.command("setlocal modifiable")
 			pad_files = self.get_filelist(query)
 			if pad_files != []:
 				self.fill_list(pad_files)
+				info = ""
 			else:
-				break
+				del vim.current.buffer[:]
+				info = "[NOT FOUND] "
 			vim.command("redraw")
-			vim.command('echo ">> ' + query + '"')
+			vim.command('echo ">> ' + info + query + '"')
 
 pad = Pad()
 EOF

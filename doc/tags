@@ -1,0 +1,15 @@
+:ListPads	pad.txt	/*:ListPads*
+:OpenPad	pad.txt	/*:OpenPad*
+g:pad_custom_mappings	pad.txt	/*g:pad_custom_mappings*
+g:pad_dir	pad.txt	/*g:pad_dir*
+g:pad_format	pad.txt	/*g:pad_format*
+g:pad_search_backend	pad.txt	/*g:pad_search_backend*
+g:pad_search_ignore_case	pad.txt	/*g:pad_search_ignore_case*
+g:pad_search_show_only_first	pad.txt	/*g:pad_search_show_only_first*
+vim-pad	pad.txt	/*vim-pad*
+vim-pad	pad.txt	/*vim-pad*
+vim-pad	pad.txt	/*vim-pad*
+vim-pad-configuration	pad.txt	/*vim-pad-configuration*
+vim-pad-design-rationale	pad.txt	/*vim-pad-design-rationale*
+vim-pad-global-commands	pad.txt	/*vim-pad-global-commands*
+vim-pad-local-commands	pad.txt	/*vim-pad-local-commands*

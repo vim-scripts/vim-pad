@@ -1,8 +1,8 @@
 syn match PadTimestamp /^.\{-}│/ contains=PadName
-syn match PadName /^.\{-}@/ contained conceal cchar=@
+syn match PadName /^.\{-}@/ contained conceal
 syn match PadNewLine /\%u21b2/
 syn match PadFT /\%u25aa.*\%u25aa/
-syn match PadHashTag /\(@\|#\)\a\+/
+syn match PadHashTag /\(@\|#\)\a\+\(\s\|\n\|\%u21b2\)\@=/
 syn region PadSummary start=/│\@<= /hs=s+1 end=/\(\%u21b2\|$\)\@=/ contains=PadHashTag,PadFT
 
 hi! link PadTimestamp Comment
