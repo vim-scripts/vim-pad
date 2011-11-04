@@ -94,7 +94,7 @@ class Pad(object):
 		vim.command("noremap <silent> <buffer> <localleader>+m :py pad.pad_add_modeline()<cr>")
 		if first_line:
 			vim.current.buffer.append(first_line,0)
-			vim.command("normal j")
+			vim.command("normal! j")
 
 	def pad_update(self):
 		modified = bool(int(vim.eval("b:pad_modified")))
@@ -111,7 +111,6 @@ class Pad(object):
 			if confirm in ("y", "Y"):
 				remove(path)
 				vim.command("bd!")
-				vim.command("unmap <leader><delete>")
 				vim.command("redraw!")
 
 	def pad_add_modeline(self):
@@ -184,7 +183,7 @@ class Pad(object):
 		# we now show the list
 		del vim.current.buffer[:] # clear the buffer
 		vim.current.buffer.append(list(reversed(sorted(lines))))
-		vim.command("normal dd")
+		vim.command("normal! dd")
 		vim.command("setlocal nomodifiable")
 	
 	def list_pads(self, query):
