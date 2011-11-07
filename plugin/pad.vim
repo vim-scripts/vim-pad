@@ -42,25 +42,33 @@ endif
 
 " Commands:
 "
+" Creates a new note
 command! OpenPad exec 'py pad.pad_open()'
+" Shows a list of the existing notes
 command! -nargs=? ListPads exec "py pad.list_pads('<args>')"
 
 " Key Mappings:
 "
 " IMPORTANT: Change this to your linking
 
-if !exists('g:pad_custom_mappings') || g:pad_custom_mappings == 0
+if has("gui_running")
 	noremap <silent> <C-esc> <esc>:ListPads<CR>
 	inoremap <silent> <C-esc> <esc>:ListPads<CR>
 	noremap <silent> <S-esc> <esc>:OpenPad<CR>
 	inoremap <silent> <S-esc> <esc>:OpenPad<CR>
-	noremap <silent> <leader>s  :py pad.search_pads()<cr>
+else " the previous mappings don't work in the terminal
+	noremap <silent> <leader><esc> <esc>:ListPads<CR>
+	inoremap <silent> <leader><esc> <esc>:ListPads<CR>
+	noremap <silent> <leader>n <esc>:OpenPad<CR>
+	inoremap <silent> <leader>n <esc>:OpenPad<CR>
 endif
+noremap <silent> <leader>s  :py pad.search_pads()<cr>
 
 " To update the date when files are modified
 execute "au! BufEnter" printf("%s*", g:pad_dir) ":let b:pad_modified = 0"
 execute "au! BufWritePre" printf("%s*", g:pad_dir) ":let b:pad_modified = eval(&modified)"
 execute "au! BufLeave" printf("%s*", g:pad_dir) ":py pad.pad_update()"
 
+" Load the plugin
 pyfile <sfile>:p:h/pad.py
 python pad=Pad()
