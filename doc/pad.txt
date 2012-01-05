@@ -1,4 +1,4 @@
-*vim-pad*                     for vim 7.3               Last change: 10 nov 2011
+*vim-pad*                     for vim 7.3               Last change: 5 jan 2012
 
 vim-pad is a quick notetaking plugin for vim.
 
@@ -60,6 +60,10 @@ the file accordingly.
 CONFIGURATION                                         *vim-pad-configuration*
 -------------
 
+NOTE FOR WINDOWS USERS: The plugin will not work correctly unless `encoding` is
+set to `utf-8` in your vimrc. Minimal compatibility for latin1 has been
+provided, though (the plugin will load, but render incorrectly).
+
 IMPORTANT 1: set the *g:pad_dir* variable in your .vimrc, to indicate where the
 notes will be saved. The default is:
 
@@ -67,6 +71,11 @@ notes will be saved. The default is:
 
 If the path is invalid (is not writeable or doesn't exist), vim-pad will nag
 you to set a valid one.
+
+NOTE FOR WINDOWS USERS: The pathname escaping is different in Windows. You
+might need to escape backward slashes, like so:
+
+    let g:pad_dir = "C:\\Users\\Foo\\Documents\\Notes"
 
 IMPORTANT 2: Please check the mappings before using the plugin. The default
 mappings are quite ergonomic, but you might want to change them. Also, if the
@@ -109,6 +118,9 @@ There is a variant highlighting scheme you can enable by setting
 vim-pad can search using either `grep` or `ack` (grep is the default). You can
 set this using the *g:pad_search_backend* variable. By default, the search
 ignores case (adjust *g:pad_search_ignore_case* as desired).
+
+NOTE FOR WINDOWS USERS: You will need a GNU grep compatible executable
+in your $PATH in order to search. Cygwin's version has been tested succesfully.
 
 When showing the list of notes, vim-pad reads by default 200 chars from the
 files, in order to show a summary of the file. You can adjust how many chars

@@ -9,53 +9,53 @@ from os.path import expanduser, exists, basename, join, getmtime
 from shutil import move
 from subprocess import Popen, PIPE
 
-def pad_timestamp():
-	"""pad_timestamp() -> timestamp_string
-	
-	Returns a string of digits representing the current time.
-	"""
-	return str(int(time.time() * 1000000))
-
-def pad_natural_timestamp(timestamp):
-	"""pad_natural_timestamp(timestamp) -> natural_timestamp
-	
-	Returns a string representing a datetime object.
-
-	    timestamp: a string in the format returned by pad_timestamp.
-
-	The output uses a natural format for timestamps within the previous
-	24 hours, and the format %Y-%m-%d %H:%M:%S otherwise.
-	"""
-	timestamp = basename(timestamp)
-	f_timestamp = float(int(timestamp)) / 1000000
-	tmp_datetime = datetime.datetime.fromtimestamp(f_timestamp)
-	diff = datetime.datetime.now() - tmp_datetime
-	days = diff.days
-	seconds = diff.seconds
-	minutes = seconds/60
-	hours = minutes/60
-	
-	if days > 0:
-		return tmp_datetime.strftime("%Y-%m-%d %H:%M:%S")
-	if hours < 1:
-		if minutes < 1:
-			return str(seconds) + "s ago"
-		else:
-			seconds_diff = seconds - (minutes * 60)
-			if seconds_diff != 0:
-				return str(minutes) + "m and " + str(seconds_diff) + "s ago"
-			else:
-				return str(minutes) + "m ago"
-	else:
-		minutes_diff = minutes - (hours * 60)
-		if minutes_diff != 0:
-			return str(hours) + "h and " + str(minutes_diff) + "m ago"
-		else:
-			return str(hours) + "h ago"
-
 class Pad(object):
 	"""This handles all the operations of the plugin. 
 	It works as a namespace of sorts."""
+	
+	def __timestamp(self):
+		"""__timestamp() -> str:timestamp
+		
+		Returns a string of digits representing the current time.
+		"""
+		return str(int(time.time() * 1000000))
+
+	def __natural_timestamp(self, timestamp):
+		"""pad_natural_timestamp(str:timestamp) -> str:natural_timestamp
+		
+		Returns a string representing a datetime object.
+
+			timestamp: a string in the format returned by pad_timestamp.
+
+		The output uses a natural format for timestamps within the previous
+		24 hours, and the format %Y-%m-%d %H:%M:%S otherwise.
+		"""
+		timestamp = basename(timestamp)
+		f_timestamp = float(int(timestamp)) / 1000000
+		tmp_datetime = datetime.datetime.fromtimestamp(f_timestamp)
+		diff = datetime.datetime.now() - tmp_datetime
+		days = diff.days
+		seconds = diff.seconds
+		minutes = seconds/60
+		hours = minutes/60
+		
+		if days > 0:
+			return tmp_datetime.strftime("%Y-%m-%d %H:%M:%S")
+		if hours < 1:
+			if minutes < 1:
+				return str(seconds) + "s ago"
+			else:
+				seconds_diff = seconds - (minutes * 60)
+				if seconds_diff != 0:
+					return str(minutes) + "m and " + str(seconds_diff) + "s ago"
+				else:
+					return str(minutes) + "m ago"
+		else:
+			minutes_diff = minutes - (hours * 60)
+			if minutes_diff != 0:
+				return str(hours) + "h and " + str(minutes_diff) + "m ago"
+			else:
+				return str(hours) + "h ago"
 
 	def __init__(self):
 		"""
@@ -63,13 +63,24 @@ class Pad(object):
 
 		Adjusts some external options.
 		"""
-		self.save_dir = vim.eval("g:pad_dir")
+		self.save_dir = expanduser(vim.eval("g:pad_dir"))
 		self.save_dir_set = self.save_dir != ""
 		self.filetype = vim.eval("g:pad_format")
 		self.window_height = str(vim.eval("g:pad_window_height"))
 		self.search_backend = vim.eval("g:pad_search_backend")
 		self.ignore_case = bool(int(vim.eval("g:pad_search_ignorecase")))
 		self.read_chars = int(vim.eval("g:pad_read_nchars_from_files"))
+
+		# create the caches
+		self.cached_data = []
+		self.cached_timestamps = []
+		self.cached_filenames = []
+
+		# Under windows, we need the path to be in a certain format 
+		if vim.eval('has("win32")') == "1":
+			save_dir = self.save_dir.replace("\\", "\\\\")
+		else:
+			save_dir = self.save_dir
 
 		# vim-pad pollutes the MRU.vim list quite a lot, if let alone.
 		# This should fix that.
@@ -80,16 +91,29 @@ class Pad(object):
 			else:
 				tail = ''
 			vim.command("let MRU_Exclude_Files = '^" + 
-					self.save_dir.replace("~", expanduser("~")) + "/*" + tail + "'")
+					join(save_dir, ".*") + tail + "'")
 
 		# we forbid writing backups of the notes
 		orig_backupskip = vim.eval("&backupskip")
 		vim.command("set backupskip=" + 
-				",".join([orig_backupskip, self.save_dir.replace("~", expanduser("~")) + "/*"]))
+				",".join([orig_backupskip, join(save_dir, "*")]))
 
-		self.cached_data = []
-		self.cached_timestamps = []
-		self.cached_filenames = []
+
+		# we set listchars, for formatting purposes
+		tmp=[i.split(":")[0] for i in vim.eval("&listchars").split(",")]
+		# we won't touch listchars if the values we want to change are already set
+		if vim.eval('has("multi_byte_encoding")') == "1":
+			if "extends" not in tmp:
+				vim.command("set listchars+=extends:»")
+			if "precedes" not in tmp:
+				vim.command("set listchars+=precedes:«")
+		else:
+			if "extends" not in tmp:
+				vim.command("set listchars+=extends:�")
+			if "precedes" not in tmp:
+				vim.command("set listchars+=precedes:�")
+		del tmp
+	
 
 	# Pads
 
@@ -108,7 +132,7 @@ class Pad(object):
 		
 		# if no path is provided, we create one using the current time
 		if not path:
-			path = join(self.save_dir, pad_timestamp())
+			path = join(self.save_dir, self.__timestamp())
 
 		vim.command("silent! botright" + self.window_height + "split " + path)
 		
@@ -138,7 +162,7 @@ class Pad(object):
 		modified = bool(int(vim.eval("b:pad_modified")))
 		if modified:
 			old_path = expanduser(vim.current.buffer.name)
-			new_path = expanduser(join(self.save_dir, pad_timestamp()))
+			new_path = expanduser(join(self.save_dir, self.__timestamp()))
 			vim.command("bw")
 			move(old_path, new_path)
 
@@ -172,17 +196,17 @@ class Pad(object):
 		or ack search for query in self.save_dir.
 		"""
 		if not query or query == "":
-			files = listdir(expanduser(self.save_dir))
+			files = listdir(self.save_dir)
 		else:
 			if self.search_backend == "grep":
 				# we use Perl mode for grep (-P), because it is really fast
-				command = ["grep", "-P", "-n", "-r", query, expanduser(self.save_dir) + "/"]
+				command = ["grep", "-P", "-n", "-r", query, self.save_dir + "/"]
 			elif self.search_backend == "ack":
 				if vim.eval("executable('ack')") == "1":
 					ack_path = "ack"
 				else:
 					ack_path = "/usr/bin/vendor_perl/ack"
-				command = [ack_path, query, expanduser(self.save_dir) + "/", "--type=text"]
+				command = [ack_path, query, self.save_dir + "/", "--type=text"]
 			
 			if self.ignore_case:
 				command.append("-i")
@@ -190,7 +214,7 @@ class Pad(object):
 			
 			search_results = [line.split(":")[0] 
 					for line in Popen(command, stdout=PIPE, stderr=PIPE).communicate()[0].\
-								replace(expanduser(self.save_dir) + "/", "").\
+								replace(self.save_dir + "/", "").\
 								split("\n")	if line != '']	
 			
 			files = list(reversed(sorted(search_results)))
@@ -208,13 +232,13 @@ class Pad(object):
 
 		Keeps a cache so we only read the notes when the files have been modified.
 		"""
-		timestamps = [getmtime(expanduser(self.save_dir) + "/" + f) for f in files]
+		timestamps = [getmtime(join(self.save_dir, f)) for f in files]
 		
 		# we will have a new list only on the following cases
 		if queried or files != self.cached_filenames or timestamps != self.cached_timestamps:
 			lines = []
 			for pad in files:
-				with open(join(expanduser(self.save_dir), pad)) as pad_file:
+				with open(join(self.save_dir, pad)) as pad_file:
 					data = [line for line in pad_file.read(self.read_chars).split("\n") if line != ""]
 				if data != []:
 					# we discard modelines
@@ -245,7 +269,7 @@ class Pad(object):
 		# update natural timestamps
 		def add_natural_timestamp(matchobj):
 			id_string = matchobj.group("id")
-			return id_string + " @ " + pad_natural_timestamp(id_string).ljust(19) + " │"
+			return id_string + " @ " + self.__natural_timestamp(id_string).ljust(19) + " │"
 		
 		if not queried: # we use the cache
 			lines = [re.sub("(?P<id>^.*?) @", add_natural_timestamp, line) for line in self.cached_data]
@@ -256,7 +280,6 @@ class Pad(object):
 		del vim.current.buffer[:] # clear the buffer
 		vim.current.buffer.append(list(reversed(sorted(lines))))
 		vim.command("normal! dd")
-		vim.command("setlocal nomodifiable")
 	
 	def list_pads(self, query):
 		""" Shows a list of notes.
@@ -276,6 +299,7 @@ class Pad(object):
 			vim.command("silent! botright " + self.window_height + "new __pad__")
 			self.__fill_list(pad_files, query != "")
 			vim.command("set filetype=pad")
+			vim.command("setlocal nomodifiable")
 		else:
 			print "no pads"
 
@@ -343,7 +367,7 @@ class Pad(object):
 		"""
 		confirm = vim.eval('input("really delete? (y/n): ")')
 		if confirm in ("y", "Y"):
-			path = join(expanduser(self.save_dir), vim.current.line.split(" @")[0])
+			path = join(self.save_dir, vim.current.line.split(" @")[0])
 			remove(path)
 			vim.command("bd")
 			vim.command("redraw!")

@@ -1,8 +1,8 @@
+setlocal fileencoding=utf-8
 setlocal cursorline
 setlocal buftype=nofile
 setlocal noswapfile
 setlocal nowrap
-setlocal listchars=extends:…,precedes:…
 setlocal nomodified
 setlocal conceallevel=2
 setlocal concealcursor=nc
