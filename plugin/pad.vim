@@ -30,6 +30,12 @@ endif
 if !exists('g:pad_window_height')
 	let g:pad_window_height = 5
 endif
+if !exists('g:pad_window_width')
+	let g:pad_window_width = 40
+endif
+if !exists('g:pad_position')
+	let g:pad_position = "bottom"
+endif
 if !exists('g:pad_search_backend')
 	let g:pad_search_backend = "grep"
 endif
@@ -48,6 +54,9 @@ endif
 if !exists('g:pad_modeline_position')
 	let g:pad_modeline_position = 'bottom'
 endif
+if !exists('g:pad_show_dir')
+	let g:pad_show_dir = 1
+endif
 
 " Base: {{{1
 python<<EOF
@@ -60,7 +69,7 @@ EOF
 " Creates a new note
 command! OpenPad call pad#OpenPad()
 " Shows a list of the existing notes
-command! -nargs=? ListPads call pad#ListPads('<args>')
+command! -nargs=? -bang ListPads call pad#ListPads('<args>', '<bang>')
 
 " Key Mappings: {{{1
 "
@@ -88,18 +97,22 @@ function! s:CreateMapping(key, action, modename)
   endtry
 endfunction
 
-if g:pad_use_default_mappings == 1
+if g:pad_use_default_mappings > 0
+	call s:CreateMapping("<leader>s", "SearchPads", "normal")
 	if has("gui_running")
-    call s:CreateMapping("<C-esc>", "ListPads", "normal")
-    call s:CreateMapping("<C-esc>", "ListPads", "insert")
-    call s:CreateMapping("<S-esc>", "OpenPad", "normal")
-    call s:CreateMapping("<S-esc>", "OpenPad", "insert")
+		call s:CreateMapping("<C-esc>", "ListPads", "normal")
+		call s:CreateMapping("<S-esc>", "OpenPad", "normal")
 	else " the previous mappings don't work in the terminal
-    call s:CreateMapping("<leader><esc>", "ListPads", "normal")
-    call s:CreateMapping("<leader><esc>", "ListPads", "insert")
-    call s:CreateMapping("<leader>n", "OpenPad", "normal")
-    call s:CreateMapping("<leader>n", "OpenPad", "insert")
+		call s:CreateMapping("<leader><esc>", "ListPads", "normal")
+		call s:CreateMapping("<leader>n", "OpenPad", "normal")
 	endif
-
-  call s:CreateMapping("<leader>s", "SearchPads", "normal")
+	if g:pad_use_default_mappings > 1
+		if has("gui_running")
+			call s:CreateMapping("<C-esc>", "ListPads", "insert")
+			call s:CreateMapping("<S-esc>", "OpenPad", "insert")
+		else
+			call s:CreateMapping("<leader><esc>", "ListPads", "insert")
+			call s:CreateMapping("<leader>n", "OpenPad", "insert")
+		endif
+	endif
 endif

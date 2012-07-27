@@ -12,6 +12,11 @@ if has("gui_running")
 else
 	noremap <buffer> <silent> dd :call pad#DeletePad()<cr>
 endif
+noremap <buffer> <silent> <localleader>+a :call pad#ArchivePad()<cr>
+noremap <buffer> <silent> <localleader>-a :call pad#UnarchivePad()<cr>
+noremap <buffer> <silent> <localleader>+f :call pad#MovePad()<cr>
+noremap <buffer> <silent> <localleader>-f :call pad#MovePadToSaveDir()<cr>
+
 noremap <buffer> <silent> <esc> :bw<cr>
 noremap <buffer> <silent> <S-f> :call pad#IncrementalSearch()<cr>
 noremap <buffer> <silent> <S-s> :call pad#Sort()<cr>
