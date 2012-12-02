@@ -34,13 +34,19 @@ if !exists('g:pad_window_width')
 	let g:pad_window_width = 40
 endif
 if !exists('g:pad_position')
-	let g:pad_position = "bottom"
+	let g:pad_position = { "list" : "bottom", "pads": "bottom" }
+endif
+if !exists('g:pad_open_in_split')
+	let g:pad_open_in_split = 1
 endif
 if !exists('g:pad_search_backend')
 	let g:pad_search_backend = "grep"
 endif
 if !exists('g:pad_search_ignorecase')
-let g:pad_search_ignorecase = 1
+	let g:pad_search_ignorecase = 1
+endif
+if !exists('g:pad_query_dirnames')
+	let g:pad_query_dirnames = 1
 endif
 if !exists('g:pad_read_nchars_from_files')
 	let g:pad_read_nchars_from_files = 200
@@ -57,6 +63,9 @@ endif
 if !exists('g:pad_show_dir')
 	let g:pad_show_dir = 1
 endif
+if !exists('g:pad_default_file_extension')
+    let g:pad_default_file_extension = ''
+endif
 
 " Base: {{{1
 python<<EOF
@@ -67,7 +76,7 @@ EOF
 " Commands: {{{1
 "
 " Creates a new note
-command! OpenPad call pad#OpenPad()
+command! -nargs=? OpenPad call pad#OpenPad('<args>')
 " Shows a list of the existing notes
 command! -nargs=? -bang ListPads call pad#ListPads('<args>', '<bang>')
 
