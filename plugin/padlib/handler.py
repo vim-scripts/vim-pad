@@ -6,11 +6,11 @@ import vim
 import re
 from glob import glob
 from os import walk
-from os.path import join, getmtime, isfile, isdir
+from os.path import join, getmtime, isfile, isdir, exists
 from subprocess import Popen, PIPE
 from padlib.utils import get_save_dir
 from padlib.pad import PadInfo
-from padlib.timestamps import timestamp, natural_timestamp
+from padlib.timestamps import natural_timestamp
 
 # globals (caches) {{{1
 cached_data = []
@@ -18,7 +18,7 @@ cached_timestamps = []
 cached_filenames = []
 
 
-def open_pad(path=None, first_line=None):  # {{{1
+def open_pad(path=None, first_line=""):  # {{{1
     """Creates or opens a note.
 
     path: a valid path for a note.
@@ -35,7 +35,7 @@ def open_pad(path=None, first_line=None):  # {{{1
     # if no path is provided, we create one using the current time
     if not path:
         path = join(get_save_dir(),
-                    timestamp() + vim.eval("g:pad_default_file_extension"))
+                    PadInfo([first_line]).id + vim.eval("g:pad_default_file_extension"))
     path = path.replace(" ", "\ ")
 
     if bool(int(vim.eval("g:pad_open_in_split"))):
@@ -143,6 +143,8 @@ def fill_list(files, queried=False, custom_order=False): # {{{1
     if custom_order:
         queried = True
 
+    files = filter(exists, [join(get_save_dir(), f) for f in files])
+
     timestamps = [getmtime(join(get_save_dir(), f)) for f in files]
 
     # we will have a new list only on the following cases
@@ -226,4 +228,44 @@ def search_pads(): # {{{1
     query = vim.eval('input(">>> ")')
     display(query, "")
     vim.command("redraw!")
+
+def global_incremental_search():  # {{{1
+    """ Provides incremental search in normal mode without opening the list.
+    """
+    query = ""
+    should_create_on_enter = False
+
+    vim.command("echohl None")
+    vim.command('echo ">> "')
+    while True:
+        raw_char = vim.eval("getchar()")
+        if raw_char in ("13", "27"):
+            if raw_char == "13":
+                if should_create_on_enter:
+                    open_pad(first_line=query)
+                    vim.command("echohl None")
+                else:
+                    display(query, True)
+            vim.command("redraw!")
+            break
+        else:
+            try:   # if we can convert to an int, we have a regular key
+                int(raw_char)   # we bring up an error on nr2char
+                last_char = vim.eval("nr2char(" + raw_char + ")")
+                query = query + last_char
+            except:  # if we don't, we have some special key
+                keycode = unicode(raw_char, errors="ignore")
+                if keycode == "kb":  # backspace
+                    query = query[:-len(last_char)]
+        pad_files = get_filelist(query)
+        if pad_files != []:
+            info = ""
+            vim.command("echohl None")
+            should_create_on_enter = False
+        else:  # we will create a new pad
+            info = "[NEW] "
+            vim.command("echohl WarningMsg")
+            should_create_on_enter = True
+        vim.command("redraw")
+        vim.command('echo ">> ' + info + query + '"')
 
