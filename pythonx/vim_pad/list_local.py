@@ -7,8 +7,8 @@ import re
 from os import remove, mkdir
 from os.path import join, basename, exists
 from shutil import move
-from padlib.handler import open_pad, get_filelist, fill_list
-from padlib.utils import get_save_dir, make_sure_dir_is_empty
+from vim_pad.handler import open_pad, get_filelist, fill_list
+from vim_pad.utils import get_save_dir, make_sure_dir_is_empty
 
 
 def get_selected_path():  # {{{1
@@ -19,8 +19,9 @@ def edit_pad():  # {{{1
     """ Opens the currently selected note in the __pad__ buffer.
     """
     path = get_selected_path()
+    query=vim.eval('b:pad_query')
     vim.command("bd")
-    open_pad(path=path)
+    open_pad(path=path, query=query)
 
 
 def delete_pad():  # {{{1
@@ -36,7 +37,7 @@ def delete_pad():  # {{{1
 
 
 def move_to_folder(path=None):  # {{{1
-    """ Moves the selected pad to a subfolder of g:pad_dir
+    """ Moves the selected pad to a subfolder of g:pad#dir
     """
     selected_path = get_selected_path()
     if path is None:
@@ -51,7 +52,7 @@ def move_to_folder(path=None):  # {{{1
 
 
 def move_to_savedir():  # {{{1
-    """ Moves a note to g:pad_dir
+    """ Moves a note to g:pad#dir
     """
     move_to_folder("")
 
@@ -97,6 +98,7 @@ def incremental_search():  # {{{1
         vim.command("setlocal modifiable")
         pad_files = get_filelist(query)
         if pad_files != []:
+            vim.command("let b:pad_query = '"+query+"'")
             fill_list(pad_files, query != "")
             vim.command("setlocal nomodifiable")
             info = ""

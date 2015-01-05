@@ -1,8 +1,8 @@
 import vim
 import re
-from os.path import abspath, basename
-from padlib.timestamps import timestamp
-from padlib.utils import get_save_dir
+from os.path import abspath, basename, dirname, relpath
+from vim_pad.timestamps import timestamp
+from vim_pad.utils import get_save_dir
 
 
 class PadInfo(object):
@@ -18,7 +18,7 @@ class PadInfo(object):
         * a list of strings, one per line
         """
 
-        nchars = int(vim.eval("g:pad_read_nchars_from_files"))
+        nchars = int(vim.eval("g:pad#read_nchars_from_files"))
         self.summary = ""
         self.body = ""
         self.isEmpty = True
@@ -28,9 +28,16 @@ class PadInfo(object):
         if source is vim.current.buffer:
             source = source[:10]
         elif source.__class__ == file:
-            pos = len(get_save_dir()), len(basename(source.name))
-            self.folder = abspath(source.name)[pos[0]:-pos[1]]
-            source = source.read(nchars).split("\n")
+            save_dir = get_save_dir()
+            if abspath(source.name).startswith(save_dir):
+                pos = len(get_save_dir()), len(basename(source.name))
+                self.folder = abspath(source.name)[pos[0]:-pos[1]]
+            else:
+                self.folder = dirname(relpath(source.name, vim.eval('getcwd()')))
+            if vim.eval("g:pad#title_first_line") == '1':
+                source = source.readline().split("\n")
+            else:
+                source = source.read(nchars).split('\n')
 
         data = [line.strip() for line in source if line != ""]
 
@@ -50,12 +57,14 @@ class PadInfo(object):
             self.body = u'\u21b2'.encode('utf-8').join(data[1:]).strip()
             # if we have orgmode tag data, add it to the body
             if org_tags_data:
-                self.body = u'\u21b2'.encode('utf-8').join(\
+                self.body = ' '.join(\
                     [" ".join(\
                               map(lambda a: "@" + a, \
                                   filter(lambda a: a != "", \
                                          org_tags_data.group("tags").split(":")))), \
                      self.body])
+            # remove extra spaces in bodies
+            self.body = re.sub("\s{2,}", "", self.body)
 
         if self.summary != "":
             self.isEmpty = False
